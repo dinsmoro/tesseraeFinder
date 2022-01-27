@@ -383,6 +383,33 @@ for i in range(0,len(tbox)):
     tbox[i][0][tbox[i][0][:,0] > 360,0] = 360; #keep right
 #END FOR i
 
+#---Lil bonus zone to get nominal
+#Haversine box calculations for box edge lengths
+tbox_major = np.zeros((len(tbox)),dtype=np.bool_); #preallocate
+tbox_len = np.zeros((len(tbox),4)); #preallocate
+tbox_bearing = np.zeros((len(tbox),4)); #preallocate
+tbox_delta = np.zeros((len(tbox),4,2)); #preallocate
+for i in range(0,len(tbox)):
+    for j in range(-1,tbox[i][0].shape[0]-1):
+        haverz = np.sin((tbox[i][0][j+1,1]-tbox[i][0][j,1])*np.pi/180/2)**2 + np.cos(tbox[i][0][j,1]*np.pi/180) *  np.cos(tbox[i][0][j+1,1]*np.pi/180) *  np.sin((tbox[i][0][j+1,0]-tbox[i][0][j,0])*np.pi/180 / 2)**2; #1st part of haversine formula
+        tbox_len[i,j+1] = 6051.8*2*np.arctan2(np.sqrt(haverz), np.sqrt(1- haverz)); #km, arc length between coordinate pts
+        tbox_bearing[i,j+1] = (np.arctan2( np.sin((tbox[i][0][j+1,0]-tbox[i][0][j,0])*np.pi/180)*np.cos(tbox[i][0][j+1,1]*np.pi/180) , np.cos(tbox[i][0][j,1]*np.pi/180)*np.sin(tbox[i][0][j+1,1]*np.pi/180) - np.sin(tbox[i][0][j,1]*np.pi/180)*np.cos(tbox[i][0][j+1,1]*np.pi/180)*np.cos((tbox[i][0][j+1,0]-tbox[i][0][j,0])*np.pi/180) )*180/np.pi+360)%360; #0 to 360 bearing direction
+        tbox_delta[i,j+1,0] = np.abs(tbox[i][0][j+1,0] - tbox[i][0][j,0]); #longitude delta
+        tbox_delta[i,j+1,1] = np.abs(tbox[i][0][j+1,1] - tbox[i][0][j,1]); #latitude delta
+        tbox_major[i] = tbox[i][1] > 0; #record if it is a major tesserae region
+    #END FOR j
+#END FOR i
+tbox_major_len = tbox_len[tbox_major,:]; #get only major stuff
+tbox_major_bearing = tbox_bearing[tbox_major,:]; #get only major stuff
+tbox_major_delta = tbox_delta[tbox_major,:,:]; #get only major stuff
+k_upOrDown = ((tbox_major_bearing > 45) & (tbox_major_bearing < 135)) | ((tbox_major_bearing > 225) & (tbox_major_bearing < 315)); #get where bearing is going up or down
+tbox_major_len_nominal_upOrDown = np.mean(tbox_major_len[k_upOrDown]); #only get feature size that is vertical - doesn't matter how thick stuff is b/c movement is mostly longitudinal - !!this didn't change it much, so including all
+tbox_major_len_nominal = np.mean(tbox_major_len); #km, get nominal feature size
+tbox_major_delta_nominal = np.mean(np.mean(tbox_major_delta,axis = 1),axis = 0); #[longitude delta nominal, latitude delta nominal]
+print('Nominal Major Tesserae Region (only counting up/down lines since they are perpendicular to balloon trajectory): '+str(np.round(tbox_major_len_nominal_upOrDown,2))+' km');
+print('Nominal Major Tesserae Region (all lines in a major region): '+str(np.round(tbox_major_len_nominal,2))+' km');
+print('Nominal Major Tesserae Region (lat/long delta): '+str(np.round(tbox_major_delta_nominal[1],2))+'° x '+str(np.round(tbox_major_delta_nominal[0],2))+'° [lat x long]');
+
 locz_dict = []; #prep a dict
 obz_dict = {}; #prep a dict
 obz_dict['obz'] = []; #prep sublist
